@@ -165,6 +165,7 @@ jobs:
           MARKDOWN
 
           if gh release view "${TAG}" >/dev/null 2>&1; then
+            gh release edit "${TAG}" --notes-file release-notes.md
             gh release upload "${TAG}" release-assets/* --clobber
           else
             gh release create "${TAG}" release-assets/* --title "Kidney ${TAG}" --notes-file release-notes.md
