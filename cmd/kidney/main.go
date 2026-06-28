@@ -203,6 +203,7 @@ func runUpload(service *library.Service, args []string) {
 
 	if flags.NArg() != 1 {
 		fmt.Fprintln(os.Stderr, "usage: kidney upload [-name device-name] <local-file>")
+		fmt.Fprintln(os.Stderr, "supported formats: EPUB, PDF, MOBI, AZW, AZW3, KFX, TXT")
 		os.Exit(2)
 	}
 
@@ -398,7 +399,7 @@ Commands:
   devices  Print detected Kindle devices.
   doctor   Check USB visibility and MTP/disk tooling.
   list     List supported files on Kindle.
-  upload   Upload one local file to Kindle.
+  upload   Upload one EPUB, PDF, MOBI, AZW, AZW3, KFX, or TXT file to Kindle.
   download Download one Kindle file.
   delete   Delete one file from Kindle.
   rename   Rename one file on Kindle.

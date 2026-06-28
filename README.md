@@ -7,6 +7,13 @@ It manages files already present on your computer and copies them to the Kindle
 documents folder. It does not download from Amazon, authenticate to Amazon, or
 remove DRM.
 
+Use Kidney when you already own the book file and just want a predictable local
+way to put it on a Kindle over USB. It keeps the workflow offline, avoids cloud
+sync and account coupling, and makes EPUB sideloading behave more like a native
+Kindle file by converting it before upload.
+
+![Kidney library screen](docs/screenshots/kidney-library.png)
+
 ## Features
 
 - Detects Kindle devices over mounted disk volumes or direct MTP.
@@ -14,7 +21,27 @@ remove DRM.
 - Uploads, downloads, renames, and deletes files from a local web UI or CLI.
 - Converts EPUB files to AZW3 with Calibre before direct USB/MTP upload so
   Kindle indexes them as local books.
+- Uploads PDF, MOBI, AZW, AZW3, KFX, and TXT files as-is.
 - Packages macOS builds with the native MTP and EPUB conversion runtime.
+
+## Downloads
+
+Prebuilt archives for macOS, Linux, and Windows are published on the permanent
+latest release page:
+
+<https://github.com/vsyaco/kidney/releases/latest>
+
+Download the archive for your operating system, unpack it, and run:
+
+```bash
+./kidney serve
+```
+
+On Windows, run `kidney.exe serve`.
+
+The macOS archives include the native MTP runtime and a pruned Calibre EPUB
+conversion runtime. Linux and Windows users should install Calibre separately
+when EPUB upload conversion is needed.
 
 ## Install
 
@@ -85,16 +112,20 @@ brew install --cask calibre
 
 ## Supported Files
 
-- `.epub`
-- `.pdf`
-- `.mobi`
-- `.azw`
-- `.azw3`
-- `.kfx`
-- `.txt`
+Kidney accepts these upload and library file formats:
+
+- `.epub` - converted to `.azw3` before upload.
+- `.pdf` - uploaded as-is because Kindle reads PDF natively.
+- `.mobi` - uploaded as-is.
+- `.azw` - uploaded as-is.
+- `.azw3` - uploaded as-is.
+- `.kfx` - uploaded as-is.
+- `.txt` - uploaded as-is.
 
 EPUB files are converted to `.azw3` before USB/MTP upload because Kindle indexes
-Kindle-native files reliably when sideloaded directly. Kidney uses Calibre:
+Kindle-native files reliably when sideloaded directly. PDF and the other
+supported Kindle-readable formats skip the conversion pipeline. Kidney uses
+Calibre for EPUB conversion:
 
 ```bash
 ebook-convert input.epub output.azw3

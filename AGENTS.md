@@ -21,11 +21,14 @@ Transport implementations must satisfy `domain.Transport` and preserve path
 safety. Do not allow absolute paths, `..`, empty path parts, or host filesystem
 paths to cross into Kindle file operations.
 
-## EPUB Conversion
+## Upload Format Handling
 
 EPUB upload is converted to AZW3 before sideloading because Kindle does not
 reliably index raw EPUB files copied over USB/MTP. Calibre `ebook-convert` is
 the only supported EPUB conversion runtime.
+
+Supported passthrough formats are PDF, MOBI, AZW, AZW3, KFX, and TXT. Do not
+send PDF through the conversion pipeline because Kindle reads PDF natively.
 
 - Do not add converter selection to the CLI or web UI without an explicit
   product decision.
@@ -60,4 +63,6 @@ env PATH=/usr/bin:/bin:/usr/sbin:/sbin \
   dist/kidney-darwin-$(uname -m)/kidney upload <epub-file>
 ```
 
-Use a disposable file for Kindle upload checks and delete it after verification.
+Use disposable files for Kindle upload checks and delete them after
+verification. For format-handling changes, verify one EPUB conversion and at
+least one passthrough upload such as PDF.

@@ -146,9 +146,17 @@
         font-weight: 600;
       }
 
+      .field-help {
+        color: var(--muted);
+        font-size: 12px;
+        font-weight: 500;
+        line-height: 1.45;
+      }
+
       input[type="text"],
       input[type="search"],
-      input[type="file"] {
+      input[type="file"],
+      select {
         width: 100%;
         min-height: 40px;
         min-width: 0;
@@ -163,7 +171,8 @@
 
       input[type="text"]:focus,
       input[type="search"]:focus,
-      input[type="file"]:focus {
+      input[type="file"]:focus,
+      select:focus {
         border-color: var(--accent);
         box-shadow: 0 0 0 3px var(--accent-soft);
       }
@@ -227,7 +236,8 @@
       }
 
       button:disabled,
-      input:disabled {
+      input:disabled,
+      select:disabled {
         cursor: not-allowed;
         opacity: .55;
       }
@@ -301,8 +311,8 @@
 
       .library-toolbar {
         display: grid;
-        grid-template-columns: minmax(0, 1fr) minmax(220px, 320px) auto;
-        align-items: center;
+        grid-template-columns: minmax(0, 1fr) auto;
+        align-items: start;
         gap: 12px;
         margin-bottom: 14px;
       }
@@ -317,6 +327,53 @@
       .count {
         color: var(--muted);
         font-size: 13px;
+        font-weight: 600;
+      }
+
+      .library-controls {
+        grid-column: 1 / -1;
+        display: grid;
+        grid-template-columns: minmax(220px, 1fr) minmax(190px, 230px);
+        gap: 10px;
+      }
+
+      .format-cloud {
+        grid-column: 1 / -1;
+        display: flex;
+        flex-wrap: wrap;
+        gap: 8px;
+        min-width: 0;
+      }
+
+      .format-cloud[hidden] {
+        display: none;
+      }
+
+      .format-chip {
+        min-height: 32px;
+        border-color: var(--line-strong);
+        background: #fff;
+        color: var(--muted-strong);
+        padding: 6px 10px;
+        font-size: 12px;
+        text-transform: uppercase;
+      }
+
+      .format-chip:hover:not(:disabled) {
+        border-color: var(--accent);
+        background: var(--accent-soft);
+        color: var(--accent-dark);
+      }
+
+      .format-chip.active {
+        border-color: var(--accent);
+        background: var(--accent);
+        color: #fff;
+      }
+
+      .format-chip-count {
+        color: inherit;
+        opacity: .7;
         font-weight: 600;
       }
 
@@ -442,11 +499,11 @@
         }
 
         .library-toolbar {
-          grid-template-columns: 1fr;
+          grid-template-columns: 1fr auto;
         }
 
         .library-title {
-          justify-content: space-between;
+          flex-wrap: wrap;
         }
       }
 
@@ -478,6 +535,11 @@
         .book-actions button {
           min-width: 0;
           padding-inline: 8px;
+        }
+
+        .library-toolbar,
+        .library-controls {
+          grid-template-columns: 1fr;
         }
 
         .rename-panel {
@@ -519,10 +581,16 @@
               <label>
                 Local file
                 <input id="fileInput" type="file" name="file" accept=".epub,.pdf,.mobi,.azw,.azw3,.kfx,.txt">
+                <span class="field-help">
+                  Supported: EPUB, PDF, MOBI, AZW, AZW3, KFX, TXT. EPUB uploads are converted to AZW3; PDF and other Kindle-readable formats are uploaded as-is.
+                </span>
               </label>
               <label>
-                File name on Kindle
-                <input id="nameInput" type="text" name="name" placeholder="Optional">
+                Optional Kindle file name
+                <input id="nameInput" type="text" name="name" placeholder="Use original file name">
+                <span class="field-help">
+                  Enter the name without an extension. Kidney uses the final upload format extension, which can differ after conversion.
+                </span>
               </label>
               <button id="uploadButton" class="full-width" type="submit">Upload</button>
             </div>
@@ -549,8 +617,17 @@
               <h2>Library</h2>
               <span id="bookCount" class="count"></span>
             </div>
-            <input id="searchInput" type="search" placeholder="Search books">
             <button id="refreshButton" class="ghost" type="button">Refresh</button>
+            <div class="library-controls">
+              <input id="searchInput" type="search" placeholder="Search books" aria-label="Search books">
+              <select id="sortSelect" aria-label="Sort books">
+                <option value="modified-desc">Date newest</option>
+                <option value="modified-asc">Date oldest</option>
+                <option value="name-asc">Name A-Z</option>
+                <option value="name-desc">Name Z-A</option>
+              </select>
+            </div>
+            <div id="formatCloud" class="format-cloud" aria-label="Filter by format"></div>
           </div>
           <div id="booksList" class="books-list">
             <div class="empty-state">Loading...</div>
@@ -564,6 +641,8 @@
         connected: false,
         books: [],
         search: '',
+        selectedFormats: new Set(),
+        sort: 'modified-desc',
       };
 
       const statusDot = document.getElementById('statusDot');
@@ -578,6 +657,8 @@
       const fileInput = document.getElementById('fileInput');
       const nameInput = document.getElementById('nameInput');
       const searchInput = document.getElementById('searchInput');
+      const sortSelect = document.getElementById('sortSelect');
+      const formatCloud = document.getElementById('formatCloud');
       const refreshButton = document.getElementById('refreshButton');
       const unmountButton = document.getElementById('unmountButton');
 
@@ -606,11 +687,19 @@
         });
       }
 
-      function fileFormat(book) {
+      function bookFormat(book) {
         const name = book.name || book.path || '';
         const index = name.lastIndexOf('.');
 
-        return index === -1 ? 'file' : name.slice(index + 1);
+        return index === -1 ? 'file' : name.slice(index + 1).toLowerCase();
+      }
+
+      function displayFormat(format) {
+        return format.toUpperCase();
+      }
+
+      function fileFormat(book) {
+        return displayFormat(bookFormat(book));
       }
 
       async function readJson(response) {
@@ -631,6 +720,8 @@
         fileInput.disabled = !canUseDevice;
         nameInput.disabled = !canUseDevice;
         uploadButton.disabled = !canUseDevice;
+        searchInput.disabled = !canUseDevice;
+        sortSelect.disabled = !canUseDevice;
         unmountButton.disabled = !canUseDevice || !status.device?.mountPath;
 
         renderDevice(status);
@@ -676,16 +767,19 @@
       async function refreshBooks() {
         if (!state.connected) {
           state.books = [];
+          state.selectedFormats.clear();
           renderBooks();
           return;
         }
 
         state.books = await fetch('/api/books').then(readJson);
+        pruneSelectedFormats();
         renderBooks();
       }
 
       function renderBooks() {
         booksList.replaceChildren();
+        renderFormatCloud();
 
         if (!state.connected) {
           bookCount.textContent = '';
@@ -693,12 +787,12 @@
           return;
         }
 
-        const query = state.search.trim().toLowerCase();
-        const books = query
-          ? state.books.filter(book => `${book.name} ${book.path || ''}`.toLowerCase().includes(query))
-          : state.books;
+        const books = filteredAndSortedBooks();
+        const hasFilters = Boolean(state.search.trim()) || state.selectedFormats.size > 0;
 
-        bookCount.textContent = state.books.length === 1 ? '1 file' : `${state.books.length} files`;
+        bookCount.textContent = hasFilters
+          ? `${books.length} of ${state.books.length} files`
+          : state.books.length === 1 ? '1 file' : `${state.books.length} files`;
 
         if (!state.books.length) {
           booksList.append(renderEmptyState('No supported files found.'));
@@ -711,6 +805,114 @@
         }
 
         booksList.append(...books.map(renderBookCard));
+      }
+
+      function filteredAndSortedBooks() {
+        const query = state.search.trim().toLowerCase();
+        const books = state.books.filter(book => {
+          const matchesQuery = !query || `${book.name} ${book.path || ''}`.toLowerCase().includes(query);
+          const matchesFormat = !state.selectedFormats.size || state.selectedFormats.has(bookFormat(book));
+
+          return matchesQuery && matchesFormat;
+        });
+
+        return sortBooks(books);
+      }
+
+      function sortBooks(books) {
+        return [...books].sort((left, right) => {
+          switch (state.sort) {
+            case 'name-asc':
+              return bookTitle(left).localeCompare(bookTitle(right), undefined, {numeric: true, sensitivity: 'base'});
+            case 'name-desc':
+              return bookTitle(right).localeCompare(bookTitle(left), undefined, {numeric: true, sensitivity: 'base'});
+            case 'modified-asc':
+              return bookTimestamp(left) - bookTimestamp(right);
+            case 'modified-desc':
+            default:
+              return bookTimestamp(right) - bookTimestamp(left);
+          }
+        });
+      }
+
+      function bookTitle(book) {
+        return book.name || book.path || '';
+      }
+
+      function bookTimestamp(book) {
+        return Date.parse(book.modified || '') || 0;
+      }
+
+      function formatCounts() {
+        return state.books.reduce((counts, book) => {
+          const format = bookFormat(book);
+          counts.set(format, (counts.get(format) || 0) + 1);
+
+          return counts;
+        }, new Map());
+      }
+
+      function pruneSelectedFormats() {
+        const availableFormats = new Set(formatCounts().keys());
+
+        for (const format of state.selectedFormats) {
+          if (!availableFormats.has(format)) {
+            state.selectedFormats.delete(format);
+          }
+        }
+      }
+
+      function renderFormatCloud() {
+        formatCloud.replaceChildren();
+        formatCloud.hidden = !state.connected || !state.books.length;
+
+        if (formatCloud.hidden) {
+          return;
+        }
+
+        const counts = [...formatCounts().entries()].sort(([left], [right]) => left.localeCompare(right));
+        const allButton = renderFormatChip('all', state.books.length, state.selectedFormats.size === 0);
+        formatCloud.append(allButton);
+
+        for (const [format, count] of counts) {
+          formatCloud.append(renderFormatChip(format, count, state.selectedFormats.has(format)));
+        }
+      }
+
+      function renderFormatChip(format, count, isActive) {
+        const button = document.createElement('button');
+        button.type = 'button';
+        button.className = 'format-chip';
+        button.classList.toggle('active', isActive);
+        button.setAttribute('aria-pressed', String(isActive));
+        button.addEventListener('click', () => toggleFormat(format));
+
+        const label = document.createElement('span');
+        label.textContent = format === 'all' ? 'All' : displayFormat(format);
+
+        const countElement = document.createElement('span');
+        countElement.className = 'format-chip-count';
+        countElement.textContent = count;
+
+        button.append(label, countElement);
+
+        return button;
+      }
+
+      function toggleFormat(format) {
+        if (format === 'all') {
+          state.selectedFormats.clear();
+          renderBooks();
+          return;
+        }
+
+        if (state.selectedFormats.has(format)) {
+          state.selectedFormats.delete(format);
+        } else {
+          state.selectedFormats.add(format);
+        }
+
+        renderBooks();
       }
 
       function renderEmptyState(text) {
@@ -886,6 +1088,11 @@
 
       searchInput.addEventListener('input', event => {
         state.search = event.target.value;
+        renderBooks();
+      });
+
+      sortSelect.addEventListener('change', event => {
+        state.sort = event.target.value;
         renderBooks();
       });
 

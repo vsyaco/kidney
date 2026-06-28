@@ -1,0 +1,146 @@
+name: Release
+
+on:
+  push:
+    tags:
+      - 'v*'
+
+permissions:
+  contents: write
+
+jobs:
+  build:
+    name: Build ${{ matrix.name }}
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - name: macOS Apple Silicon
+            id: macos-arm64
+            os: macos-15
+            archive: kidney-macos-arm64.tar.gz
+            package: macos
+          - name: macOS Intel
+            id: macos-amd64
+            os: macos-15-intel
+            archive: kidney-macos-amd64.tar.gz
+            package: macos
+          - name: Linux x86_64
+            id: linux-amd64
+            os: ubuntu-24.04
+            archive: kidney-linux-amd64.tar.gz
+            package: linux
+          - name: Windows x86_64
+            id: windows-amd64
+            os: windows-latest
+            archive: kidney-windows-amd64.zip
+            package: windows
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v7
+
+      - name: Set up Go
+        uses: actions/setup-go@v6
+        with:
+          go-version-file: go.mod
+
+      - name: Install macOS dependencies
+        if: matrix.package == 'macos'
+        run: |
+          brew update
+          brew install libusb
+          brew install --cask calibre
+
+      - name: Install Linux dependencies
+        if: matrix.package == 'linux'
+        run: sudo apt-get update && sudo apt-get install -y pkg-config libusb-1.0-0-dev
+
+      - name: Install Windows dependencies
+        if: matrix.package == 'windows'
+        uses: msys2/setup-msys2@v2
+        with:
+          msystem: UCRT64
+          update: true
+          path-type: inherit
+          install: >-
+            mingw-w64-ucrt-x86_64-gcc
+            mingw-w64-ucrt-x86_64-pkgconf
+            mingw-w64-ucrt-x86_64-libusb
+
+      - name: Package macOS
+        if: matrix.package == 'macos'
+        run: |
+          scripts/package-macos.sh
+          package_dir="dist/kidney-${{ matrix.id }}"
+          mv "dist/kidney-darwin-$(uname -m)" "${package_dir}"
+          cp README.md LICENSE THIRD_PARTY.md "${package_dir}/"
+          tar -C dist -czf "dist/${{ matrix.archive }}" "kidney-${{ matrix.id }}"
+          shasum -a 256 "dist/${{ matrix.archive }}" > "dist/${{ matrix.archive }}.sha256"
+
+      - name: Package Linux
+        if: matrix.package == 'linux'
+        run: |
+          package_dir="dist/kidney-${{ matrix.id }}"
+          mkdir -p "${package_dir}"
+          go build -trimpath -ldflags="-s -w" -o "${package_dir}/kidney" ./cmd/kidney
+          cp README.md LICENSE THIRD_PARTY.md "${package_dir}/"
+          tar -C dist -czf "dist/${{ matrix.archive }}" "kidney-${{ matrix.id }}"
+          sha256sum "dist/${{ matrix.archive }}" > "dist/${{ matrix.archive }}.sha256"
+
+      - name: Package Windows
+        if: matrix.package == 'windows'
+        shell: pwsh
+        env:
+          CGO_ENABLED: '1'
+          CC: gcc
+          PKG_CONFIG_PATH: C:\msys64\ucrt64\lib\pkgconfig
+        run: |
+          $packageDir = 'dist/kidney-${{ matrix.id }}'
+          New-Item -ItemType Directory -Force $packageDir | Out-Null
+          go build -trimpath -ldflags="-s -w" -o "$packageDir/kidney.exe" ./cmd/kidney
+          Copy-Item README.md, LICENSE, THIRD_PARTY.md $packageDir
+          Copy-Item C:\msys64\ucrt64\bin\libusb-1.0.dll $packageDir
+          Compress-Archive -Path "$packageDir/*" -DestinationPath "dist/${{ matrix.archive }}" -Force
+          $hash = (Get-FileHash "dist/${{ matrix.archive }}" -Algorithm SHA256).Hash.ToLower()
+          "$hash  ${{ matrix.archive }}" | Set-Content "dist/${{ matrix.archive }}.sha256"
+
+      - name: Upload release artifact
+        uses: actions/upload-artifact@v7
+        with:
+          name: ${{ matrix.id }}
+          path: |
+            dist/${{ matrix.archive }}
+            dist/${{ matrix.archive }}.sha256
+          if-no-files-found: error
+
+  publish:
+    name: Publish GitHub Release
+    runs-on: ubuntu-24.04
+    needs: build
+
+    steps:
+      - name: Download release artifacts
+        uses: actions/download-artifact@v8
+        with:
+          path: release-assets
+          merge-multiple: true
+
+      - name: Publish release
+        env:
+          GH_TOKEN: ${{ github.token }}
+          TAG: ${{ github.ref_name }}
+        run: |
+          cat > release-notes.md <<'MARKDOWN'
+          Download the archive for your operating system, unpack it, and run `kidney serve`.
+
+          macOS archives include the native MTP runtime and a pruned Calibre EPUB conversion runtime.
+          Linux and Windows archives include the `kidney` binary; install Calibre separately when EPUB upload conversion is needed.
+          MARKDOWN
+
+          if gh release view "${TAG}" >/dev/null 2>&1; then
+            gh release upload "${TAG}" release-assets/* --clobber
+          else
+            gh release create "${TAG}" release-assets/* --title "Kidney ${TAG}" --notes-file release-notes.md
+          fi

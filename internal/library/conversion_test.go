@@ -146,6 +146,56 @@ func TestConvertUploadIfNeededUsesCalibreAZW3(t *testing.T) {
 	}
 }
 
+func TestConvertUploadIfNeededSkipsPassthroughFormats(t *testing.T) {
+	previous := findExecutablePath
+	t.Cleanup(func() {
+		findExecutablePath = previous
+	})
+
+	for _, fileName := range []string{
+		"Books/book.pdf",
+		"Books/book.mobi",
+		"Books/book.azw",
+		"Books/book.azw3",
+		"Books/book.kfx",
+		"Books/book.txt",
+	} {
+		t.Run(fileName, func(t *testing.T) {
+			converterWasResolved := false
+			findExecutablePath = func(string) (string, error) {
+				converterWasResolved = true
+				return "", os.ErrNotExist
+			}
+
+			reader, uploadName, cleanup, err := convertUploadIfNeeded(
+				context.Background(),
+				strings.NewReader("content"),
+				fileName,
+			)
+			if err != nil {
+				t.Fatalf("convertUploadIfNeeded failed: %v", err)
+			}
+			defer cleanup()
+
+			if converterWasResolved {
+				t.Fatal("passthrough upload resolved ebook-convert")
+			}
+
+			if uploadName != fileName {
+				t.Fatalf("uploadName = %q, want %q", uploadName, fileName)
+			}
+
+			content, err := io.ReadAll(reader)
+			if err != nil {
+				t.Fatalf("read passthrough content failed: %v", err)
+			}
+			if string(content) != "content" {
+				t.Fatalf("unexpected passthrough content: %q", string(content))
+			}
+		})
+	}
+}
+
 func useExecutablePath(t *testing.T, executablePath string) {
 	t.Helper()
 
