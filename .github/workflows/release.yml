@@ -69,6 +69,16 @@ jobs:
             mingw-w64-ucrt-x86_64-pkgconf
             mingw-w64-ucrt-x86_64-libusb
 
+      - name: Configure Windows dependency paths
+        if: matrix.package == 'windows'
+        shell: pwsh
+        run: |
+          if (-not $env:MSYS2_LOCATION) {
+            $env:MSYS2_LOCATION = 'C:\msys64'
+          }
+          "PKG_CONFIG_PATH=$env:MSYS2_LOCATION\ucrt64\lib\pkgconfig" | Out-File -FilePath $env:GITHUB_ENV -Append
+          "$env:MSYS2_LOCATION\ucrt64\bin" | Out-File -FilePath $env:GITHUB_PATH -Append
+
       - name: Package macOS
         if: matrix.package == 'macos'
         run: |
@@ -95,13 +105,15 @@ jobs:
         env:
           CGO_ENABLED: '1'
           CC: gcc
-          PKG_CONFIG_PATH: C:\msys64\ucrt64\lib\pkgconfig
         run: |
+          if (-not $env:MSYS2_LOCATION) {
+            $env:MSYS2_LOCATION = 'C:\msys64'
+          }
           $packageDir = 'dist/kidney-${{ matrix.id }}'
           New-Item -ItemType Directory -Force $packageDir | Out-Null
           go build -trimpath -ldflags="-s -w" -o "$packageDir/kidney.exe" ./cmd/kidney
           Copy-Item README.md, LICENSE, THIRD_PARTY.md $packageDir
-          Copy-Item C:\msys64\ucrt64\bin\libusb-1.0.dll $packageDir
+          Copy-Item "$env:MSYS2_LOCATION\ucrt64\bin\libusb-1.0.dll" $packageDir
           Compress-Archive -Path "$packageDir/*" -DestinationPath "dist/${{ matrix.archive }}" -Force
           $hash = (Get-FileHash "dist/${{ matrix.archive }}" -Algorithm SHA256).Hash.ToLower()
           "$hash  ${{ matrix.archive }}" | Set-Content "dist/${{ matrix.archive }}.sha256"
