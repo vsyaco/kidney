@@ -34,10 +34,15 @@ send PDF through the conversion pipeline because Kindle reads PDF natively.
   product decision.
 - Command resolution order is packaged
   `tools/calibre.app/Contents/MacOS/ebook-convert`, packaged
-  `tools/ebook-convert`, explicit `KIDNEY_EBOOK_CONVERT`, then `PATH`.
-- Packaged builds bundle a pruned Calibre runtime through
+  `tools/calibre/ebook-convert`, packaged `tools/ebook-convert`, explicit
+  `KIDNEY_EBOOK_CONVERT`, then `PATH`.
+- Packaged macOS builds bundle a pruned Calibre runtime through
   `scripts/package-calibre-runtime-macos.sh`.
-- Packaged builds do not bundle full Calibre, Kindle Previewer, or boko.
+- Packaged Linux and Windows builds bundle the official Calibre runtime under
+  `tools/calibre`.
+- Packaged Linux builds bundle `libusb` through
+  `scripts/package-libusb-runtime-linux.sh`.
+- Packaged builds do not bundle Kindle Previewer or boko.
 - If changing the pruned Calibre runtime allowlist, validate representative
   EPUB files and verify output on a real Kindle Paperwhite when possible.
 

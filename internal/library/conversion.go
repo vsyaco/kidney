@@ -8,6 +8,7 @@ import (
 	"os/exec"
 	"path"
 	"path/filepath"
+	"runtime"
 	"strings"
 
 	"github.com/vsyaco/kidney/internal/domain"
@@ -117,7 +118,7 @@ func bundledEbookConvertPaths() []string {
 
 	executableDir := filepath.Dir(executablePath)
 
-	return []string{
+	paths := []string{
 		filepath.Join(
 			executableDir,
 			"tools",
@@ -126,7 +127,14 @@ func bundledEbookConvertPaths() []string {
 			"MacOS",
 			ebookConvertCommandName,
 		),
+		filepath.Join(executableDir, "tools", "calibre", ebookConvertCommandName),
 	}
+
+	if runtime.GOOS == "windows" {
+		paths = append(paths, filepath.Join(executableDir, "tools", "calibre", ebookConvertCommandName+".exe"))
+	}
+
+	return paths
 }
 
 func bundledToolPath(commandName string) (string, bool) {
@@ -135,21 +143,30 @@ func bundledToolPath(commandName string) (string, bool) {
 		return "", false
 	}
 
-	toolPath := filepath.Join(
-		filepath.Dir(executablePath),
-		"tools",
-		commandName,
-	)
-
-	if !isExecutableFile(toolPath) {
-		return "", false
+	toolPaths := []string{filepath.Join(filepath.Dir(executablePath), "tools", commandName)}
+	if runtime.GOOS == "windows" {
+		toolPaths = append(toolPaths, filepath.Join(filepath.Dir(executablePath), "tools", commandName+".exe"))
 	}
 
-	return toolPath, true
+	for _, toolPath := range toolPaths {
+		if isExecutableFile(toolPath) {
+			return toolPath, true
+		}
+	}
+
+	return "", false
 }
 
 func isExecutableFile(filePath string) bool {
 	info, err := os.Stat(filePath)
 
-	return err == nil && !info.IsDir() && info.Mode()&0o111 != 0
+	if err != nil || info.IsDir() {
+		return false
+	}
+
+	if runtime.GOOS == "windows" {
+		return true
+	}
+
+	return info.Mode()&0o111 != 0
 }

@@ -11,20 +11,28 @@ authoritative license texts.
 - Purpose: EPUB to AZW3 conversion through `ebook-convert`.
 - Source: https://calibre-ebook.com/
 - License: GPL-3.0-only.
-- Packaging: `scripts/package-calibre-runtime-macos.sh` copies a pruned Calibre
-  runtime into `dist/kidney-darwin-*/tools/calibre.app`.
+- Packaging:
+  - macOS: `scripts/package-calibre-runtime-macos.sh` copies a pruned Calibre
+    runtime into `dist/kidney-darwin-*/tools/calibre.app`.
+  - Linux: `scripts/package-calibre-runtime-linux.sh` copies the official
+    Calibre Linux runtime into `tools/calibre`.
+  - Windows: `scripts/package-calibre-runtime-windows.ps1` copies the official
+    Calibre Windows runtime into `tools/calibre`.
 
 Because packaged builds distribute Calibre, packaged distributions are
-GPL-3.0-only compatible. Do not replace the pruned runtime with a full
-`calibre.app` bundle without a separate product decision.
+GPL-3.0-only compatible.
 
 ### libusb
 
 - Purpose: direct USB/MTP device access.
 - Source: https://libusb.info/
 - License: LGPL-2.1-or-later.
-- Packaging: `scripts/package-macos.sh` copies the Homebrew
-  `libusb-1.0.0.dylib` into `dist/kidney-darwin-*/lib/`.
+- Packaging:
+  - macOS: `scripts/package-macos.sh` copies the Homebrew
+    `libusb-1.0.0.dylib` into `dist/kidney-darwin-*/lib/`.
+  - Linux: `scripts/package-libusb-runtime-linux.sh` copies the linked
+    `libusb-1.0.so.*` into `lib/` and patches the binary rpath.
+  - Windows: release packaging copies `libusb-1.0.dll` into the archive root.
 
 ## Go Module Dependencies
 

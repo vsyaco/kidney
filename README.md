@@ -39,9 +39,9 @@ Download the archive for your operating system, unpack it, and run:
 
 On Windows, run `kidney.exe serve`.
 
-The macOS archives include the native MTP runtime and a pruned Calibre EPUB
-conversion runtime. Linux and Windows users should install Calibre separately
-when EPUB upload conversion is needed.
+Release archives include the native USB/MTP runtime and a bundled Calibre EPUB
+conversion runtime. Users do not need to install Calibre separately for EPUB
+uploads.
 
 ## Install
 
@@ -102,9 +102,9 @@ Local development requires:
 - Homebrew `libusb` on macOS for the direct MTP backend.
 - Calibre `ebook-convert` for EPUB conversion in unpackaged development builds.
 
-Packaged macOS builds include `libusb` and a pruned Calibre runtime, so users do
-not need to install Calibre separately. Development builds can install Calibre
-with:
+Packaged release builds include the native USB/MTP runtime and a bundled Calibre
+runtime, so users do not need to install Calibre separately. Development builds
+can install Calibre with:
 
 ```bash
 brew install --cask calibre
@@ -135,13 +135,15 @@ Kidney resolves `ebook-convert` in this order:
 
 1. Packaged Calibre runtime,
    `tools/calibre.app/Contents/MacOS/ebook-convert`.
-2. Packaged flat tool, `tools/ebook-convert`.
-3. Explicit path override: `KIDNEY_EBOOK_CONVERT`.
-4. `ebook-convert` on `PATH`.
+2. Packaged Calibre runtime, `tools/calibre/ebook-convert` or
+   `tools/calibre/ebook-convert.exe`.
+3. Packaged flat tool, `tools/ebook-convert`.
+4. Explicit path override: `KIDNEY_EBOOK_CONVERT`.
+5. `ebook-convert` on `PATH`.
 
 There is no converter selection in the CLI or web UI. Calibre is the only EPUB
-conversion runtime. Packaged macOS builds bundle a pruned Calibre runtime, not
-the full Calibre app or Kindle Previewer.
+conversion runtime. Packaged builds bundle Calibre runtime files, not Kindle
+Previewer.
 
 Rename changes the file name on Kindle storage only. Kidney does not edit book
 metadata in v1.
@@ -162,9 +164,10 @@ Kidney uses direct MTP operations for those devices:
 - No mounted temporary filesystem.
 
 The application package includes the native `libusb` runtime used by the MTP
-backend and a pruned Calibre runtime used by EPUB conversion. Local development
-can use Homebrew `libusb` and Calibre `ebook-convert`; packaged releases bundle
-both runtime pieces instead of asking users to install them separately.
+backend and a bundled Calibre runtime used by EPUB conversion. Local development
+can use Homebrew or system `libusb` and Calibre `ebook-convert`; packaged
+releases bundle both runtime pieces instead of asking users to install them
+separately.
 
 ## License
 

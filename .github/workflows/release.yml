@@ -55,7 +55,11 @@ jobs:
 
       - name: Install Linux dependencies
         if: matrix.package == 'linux'
-        run: sudo apt-get update && sudo apt-get install -y pkg-config libusb-1.0-0-dev
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y curl patchelf pkg-config libusb-1.0-0-dev
+          curl -fsSL https://download.calibre-ebook.com/linux-installer.sh -o "${RUNNER_TEMP}/calibre-linux-installer.sh"
+          sudo sh "${RUNNER_TEMP}/calibre-linux-installer.sh" install_dir=/opt
 
       - name: Install Windows dependencies
         if: matrix.package == 'windows'
@@ -68,6 +72,20 @@ jobs:
             mingw-w64-ucrt-x86_64-gcc
             mingw-w64-ucrt-x86_64-pkgconf
             mingw-w64-ucrt-x86_64-libusb
+
+      - name: Install Windows Calibre
+        if: matrix.package == 'windows'
+        shell: pwsh
+        run: |
+          $installer = Join-Path $env:RUNNER_TEMP 'calibre.msi'
+          Invoke-WebRequest -Uri https://calibre-ebook.com/dist/win64 -OutFile $installer
+          $process = Start-Process msiexec.exe -ArgumentList @('/i', $installer, '/qn', '/norestart') -Wait -PassThru
+          if ($process.ExitCode -ne 0) {
+            throw "Calibre installer failed with exit code $($process.ExitCode)"
+          }
+          if (-not (Test-Path "$env:ProgramFiles\Calibre2\ebook-convert.exe")) {
+            throw 'Calibre ebook-convert was not installed.'
+          }
 
       - name: Package macOS
         if: matrix.package == 'macos'
@@ -86,6 +104,8 @@ jobs:
           mkdir -p "${package_dir}"
           go build -trimpath -ldflags="-s -w" -o "${package_dir}/kidney" ./cmd/kidney
           cp README.md LICENSE THIRD_PARTY.md "${package_dir}/"
+          scripts/package-libusb-runtime-linux.sh "${package_dir}"
+          scripts/package-calibre-runtime-linux.sh "${package_dir}"
           tar -C dist -czf "dist/${{ matrix.archive }}" "kidney-${{ matrix.id }}"
           sha256sum "dist/${{ matrix.archive }}" > "dist/${{ matrix.archive }}.sha256"
 
@@ -101,6 +121,10 @@ jobs:
           go build -trimpath -ldflags="-s -w" -o "${package_dir}/kidney.exe" ./cmd/kidney
           cp README.md LICENSE THIRD_PARTY.md "${package_dir}/"
           cp /ucrt64/bin/libusb-1.0.dll "${package_dir}/"
+          package_dir_windows="$(cygpath -w "${package_dir}")"
+          powershell.exe -NoProfile -ExecutionPolicy Bypass \
+            -File scripts/package-calibre-runtime-windows.ps1 \
+            -DistDir "${package_dir_windows}"
           powershell.exe -NoProfile -Command \
             "Compress-Archive -Path '${package_dir}/*' -DestinationPath 'dist/${{ matrix.archive }}' -Force"
           powershell.exe -NoProfile -Command \
@@ -136,8 +160,7 @@ jobs:
           cat > release-notes.md <<'MARKDOWN'
           Download the archive for your operating system, unpack it, and run `kidney serve`.
 
-          macOS archives include the native MTP runtime and a pruned Calibre EPUB conversion runtime.
-          Linux and Windows archives include the `kidney` binary; install Calibre separately when EPUB upload conversion is needed.
+          Archives include the native USB/MTP runtime and a bundled Calibre EPUB conversion runtime.
           MARKDOWN
 
           if gh release view "${TAG}" >/dev/null 2>&1; then
