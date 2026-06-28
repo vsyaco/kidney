@@ -6,10 +6,10 @@ DIST_DIR="${ROOT_DIR}/dist/kidney-darwin-$(uname -m)"
 BIN_PATH="${DIST_DIR}/kidney"
 LIB_DIR="${DIST_DIR}/lib"
 TOOLS_DIR="${DIST_DIR}/tools"
-BOKO_PATH="${TOOLS_DIR}/boko"
 
 mkdir -p "${LIB_DIR}" "${TOOLS_DIR}"
-rm -rf "${TOOLS_DIR}/calibre.app"
+rm -f "${TOOLS_DIR}/boko"
+rm -rf "${TOOLS_DIR}/calibre.app" "${TOOLS_DIR}/Kindle Previewer 3.app"
 
 go build -o "${BIN_PATH}" "${ROOT_DIR}/cmd/kidney"
 
@@ -26,21 +26,11 @@ install_name_tool \
   -change "${LIBUSB_PATH}" "@executable_path/lib/libusb-1.0.0.dylib" \
   "${BIN_PATH}"
 
-if command -v boko >/dev/null 2>&1; then
-  cp "$(command -v boko)" "${BOKO_PATH}"
-else
-  if ! command -v cargo >/dev/null 2>&1; then
-    echo "boko not found and cargo is unavailable. Install build dependency: cargo install boko" >&2
-    exit 1
-  fi
-
-  BOKO_ROOT="${ROOT_DIR}/dist/.build-tools/boko"
-  cargo install boko --root "${BOKO_ROOT}" --locked --force
-  cp "${BOKO_ROOT}/bin/boko" "${BOKO_PATH}"
+UNAPPROVED_RUNTIME="$(find "${DIST_DIR}" -maxdepth 3 \( -name "calibre.app" -o -name "Kindle Previewer*.app" \) -print -quit)"
+if [[ -n "${UNAPPROVED_RUNTIME}" ]]; then
+  echo "Unapproved EPUB conversion runtime was packaged: ${UNAPPROVED_RUNTIME}" >&2
+  exit 1
 fi
-
-chmod 755 "${BOKO_PATH}"
-"${BOKO_PATH}" --version
 
 echo "Packaged ${BIN_PATH}"
 otool -L "${BIN_PATH}"

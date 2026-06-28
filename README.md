@@ -12,8 +12,8 @@ remove DRM.
 - Detects Kindle devices over mounted disk volumes or direct MTP.
 - Lists supported files recursively under the Kindle `documents` folder.
 - Uploads, downloads, renames, and deletes files from a local web UI or CLI.
-- Converts EPUB files to AZW3 before direct USB/MTP upload so Kindle indexes
-  them as local books.
+- Converts EPUB files to AZW3 with Calibre before direct USB/MTP upload so
+  Kindle indexes them as local books.
 - Packages macOS builds with the native MTP and EPUB conversion runtime.
 
 ## Install
@@ -33,7 +33,7 @@ go build -o kidney ./cmd/kidney
 ./kidney serve
 ```
 
-For a self-contained macOS package with bundled `libusb` and `boko`:
+For a macOS package with bundled `libusb`:
 
 ```bash
 scripts/package-macos.sh
@@ -72,11 +72,14 @@ Local development requires:
 
 - Go 1.26 or newer.
 - Homebrew `libusb` on macOS for the direct MTP backend.
-- `boko` for EPUB conversion when running unpackaged development builds:
-  `cargo install boko`.
+- Calibre `ebook-convert` for EPUB conversion.
 
-Packaged macOS builds include `libusb` and `boko`, so users do not need to
-install those tools separately.
+Packaged macOS builds include `libusb`. Calibre is still required for EPUB
+conversion and can be installed with:
+
+```bash
+brew install --cask calibre
+```
 
 ## Supported Files
 
@@ -88,10 +91,22 @@ install those tools separately.
 - `.kfx`
 - `.txt`
 
-EPUB files are converted to `.azw3` before USB/MTP upload because Kindle
-indexes Kindle-native files reliably when sideloaded directly. The conversion
-uses bundled `boko` in packaged macOS builds. Local development falls back to a
-system `boko`; install the build dependency with `cargo install boko`.
+EPUB files are converted to `.azw3` before USB/MTP upload because Kindle indexes
+Kindle-native files reliably when sideloaded directly. Kidney uses Calibre:
+
+```bash
+ebook-convert input.epub output.azw3
+```
+
+Kidney resolves `ebook-convert` in this order:
+
+1. Packaged tool next to the Kidney binary, `tools/ebook-convert`.
+2. Explicit path override: `KIDNEY_EBOOK_CONVERT`.
+3. `ebook-convert` on `PATH`.
+
+There is no converter selection in the CLI or web UI. Calibre is the only EPUB
+conversion runtime. Packaged macOS builds do not bundle full `calibre.app` or
+Kindle Previewer.
 
 Rename changes the file name on Kindle storage only. Kidney does not edit book
 metadata in v1.
@@ -112,13 +127,11 @@ Kidney uses direct MTP operations for those devices:
 - No mounted temporary filesystem.
 
 The application package includes the native `libusb` runtime used by the MTP
-backend and the `boko` binary used for EPUB conversion. Local development can use
-Homebrew `libusb` and Cargo-installed `boko`; packaged releases bundle both with
-the app instead of asking users to install them separately.
+backend. Local development can use Homebrew `libusb` and Calibre
+`ebook-convert`. Packaged releases bundle `libusb`; Calibre remains an external
+runtime dependency for EPUB conversion.
 
 ## License
 
-Kidney is licensed under GPL-3.0-or-later. See [LICENSE](LICENSE).
-
-Packaged builds bundle `boko`, which is also GPL-3.0-or-later. See
+Kidney is licensed under GPL-3.0-or-later. See [LICENSE](LICENSE) and
 [THIRD_PARTY.md](THIRD_PARTY.md) for third-party notices.

@@ -270,10 +270,10 @@ func FriendlyError(err error) string {
 func dependencyErrorMessage(err error) string {
 	message := err.Error()
 	switch {
-	case strings.Contains(message, "boko"):
-		return "EPUB conversion runtime missing: boko. " + installHint(
-			"Use the packaged Kidney build or install with: cargo install boko.",
-			"Use the packaged Kidney build or install with: cargo install boko.",
+	case strings.Contains(message, "ebook-convert"):
+		return "EPUB conversion runtime missing: ebook-convert. " + installHint(
+			"Install Calibre or set KIDNEY_EBOOK_CONVERT to the ebook-convert binary.",
+			"Install Calibre or set KIDNEY_EBOOK_CONVERT to the ebook-convert binary.",
 		)
 	case strings.Contains(message, "simple-mtpfs"):
 		return "MTP filesystem dependency missing: simple-mtpfs. " + installHint(

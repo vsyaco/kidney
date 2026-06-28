@@ -13,14 +13,25 @@ import (
 	"github.com/vsyaco/kidney/internal/domain"
 )
 
+const (
+	ebookConvertCommandName = "ebook-convert"
+	ebookConvertPathEnv     = "KIDNEY_EBOOK_CONVERT"
+	epubOutputExtension     = ".azw3"
+)
+
+var (
+	currentExecutablePath = os.Executable
+	findExecutablePath    = exec.LookPath
+)
+
 func convertUploadIfNeeded(ctx context.Context, reader io.Reader, fileName string) (io.Reader, string, func(), error) {
 	if strings.ToLower(path.Ext(fileName)) != ".epub" {
 		return reader, fileName, func() {}, nil
 	}
 
-	converterPath, err := bokoPath()
+	converterPath, err := ebookConvertPath()
 	if err != nil {
-		return nil, "", nil, fmt.Errorf("%w: boko", domain.ErrDependencyMissing)
+		return nil, "", nil, fmt.Errorf("%w: %s", domain.ErrDependencyMissing, ebookConvertCommandName)
 	}
 
 	tempDir, err := os.MkdirTemp("", "kidney-epub-convert-*")
@@ -33,7 +44,7 @@ func convertUploadIfNeeded(ctx context.Context, reader io.Reader, fileName strin
 	}
 
 	inputPath := filepath.Join(tempDir, "input.epub")
-	outputPath := filepath.Join(tempDir, "output.azw3")
+	outputPath := filepath.Join(tempDir, "output"+epubOutputExtension)
 
 	inputFile, err := os.Create(inputPath)
 	if err != nil {
@@ -52,11 +63,16 @@ func convertUploadIfNeeded(ctx context.Context, reader io.Reader, fileName strin
 		return nil, "", nil, err
 	}
 
-	command := exec.CommandContext(ctx, converterPath, "convert", inputPath, outputPath)
+	command := exec.CommandContext(ctx, converterPath, inputPath, outputPath)
 	output, err := command.CombinedOutput()
 	if err != nil {
 		cleanup()
-		return nil, "", nil, fmt.Errorf("EPUB conversion failed: %w: %s", err, strings.TrimSpace(string(output)))
+		return nil, "", nil, fmt.Errorf(
+			"EPUB conversion failed with %s: %w: %s",
+			ebookConvertCommandName,
+			err,
+			strings.TrimSpace(string(output)),
+		)
 	}
 
 	outputFile, err := os.Open(outputPath)
@@ -65,7 +81,7 @@ func convertUploadIfNeeded(ctx context.Context, reader io.Reader, fileName strin
 		return nil, "", nil, err
 	}
 
-	return outputFile, replaceExtension(fileName, ".azw3"), func() {
+	return outputFile, replaceExtension(fileName, epubOutputExtension), func() {
 		_ = outputFile.Close()
 		cleanup()
 	}, nil
@@ -75,34 +91,34 @@ func replaceExtension(fileName string, extension string) string {
 	return strings.TrimSuffix(fileName, path.Ext(fileName)) + extension
 }
 
-func bokoPath() (string, error) {
-	if configuredPath := strings.TrimSpace(os.Getenv("KIDNEY_BOKO")); configuredPath != "" {
-		return configuredPath, nil
-	}
-
-	if bundledPath, ok := bundledBokoPath(); ok {
+func ebookConvertPath() (string, error) {
+	if bundledPath, ok := bundledToolPath(ebookConvertCommandName); ok {
 		return bundledPath, nil
 	}
 
-	return exec.LookPath("boko")
+	if configuredPath := strings.TrimSpace(os.Getenv(ebookConvertPathEnv)); configuredPath != "" {
+		return configuredPath, nil
+	}
+
+	return findExecutablePath(ebookConvertCommandName)
 }
 
-func bundledBokoPath() (string, bool) {
-	executablePath, err := os.Executable()
+func bundledToolPath(commandName string) (string, bool) {
+	executablePath, err := currentExecutablePath()
 	if err != nil {
 		return "", false
 	}
 
-	converterPath := filepath.Join(
+	toolPath := filepath.Join(
 		filepath.Dir(executablePath),
 		"tools",
-		"boko",
+		commandName,
 	)
 
-	info, err := os.Stat(converterPath)
+	info, err := os.Stat(toolPath)
 	if err != nil || info.IsDir() || info.Mode()&0o111 == 0 {
 		return "", false
 	}
 
-	return converterPath, true
+	return toolPath, true
 }

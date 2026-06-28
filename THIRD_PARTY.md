@@ -4,18 +4,16 @@ Kidney depends on and may package third-party components. This file is a
 human-readable summary; individual dependency source distributions remain the
 authoritative license texts.
 
+## External Runtime Dependencies
+
+### Calibre
+
+- Purpose: EPUB to AZW3 conversion through `ebook-convert`.
+- Source: https://calibre-ebook.com/
+- Packaging: not bundled. Do not copy full `calibre.app` into `dist` without a
+  separate product and licensing decision.
+
 ## Bundled In Packaged Builds
-
-### boko
-
-- Purpose: EPUB to AZW3 conversion before direct Kindle USB/MTP upload.
-- Source: https://github.com/zacharydenton/boko
-- License: GPL-3.0-or-later.
-- Packaging: `scripts/package-macos.sh` installs or copies the `boko` CLI into
-  `dist/kidney-darwin-*/tools/boko`.
-
-Because packaged builds distribute `boko`, Kidney is licensed as
-GPL-3.0-or-later.
 
 ### libusb
 

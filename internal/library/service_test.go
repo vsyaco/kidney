@@ -2,6 +2,7 @@ package library
 
 import (
 	"context"
+	"fmt"
 	"io"
 	"strings"
 	"testing"
@@ -180,5 +181,13 @@ func TestServiceKeepsExplicitUploadPath(t *testing.T) {
 
 	if transport.uploaded != "Custom/book.azw3:content" {
 		t.Fatalf("unexpected upload target: %q", transport.uploaded)
+	}
+}
+
+func TestFriendlyErrorNamesCalibreRuntime(t *testing.T) {
+	err := fmt.Errorf("%w: ebook-convert", domain.ErrDependencyMissing)
+
+	if got := FriendlyError(err); !strings.Contains(got, "ebook-convert") {
+		t.Fatalf("unexpected friendly error: %q", got)
 	}
 }

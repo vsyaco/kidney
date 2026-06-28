@@ -24,19 +24,21 @@ paths to cross into Kindle file operations.
 ## EPUB Conversion
 
 EPUB upload is converted to AZW3 before sideloading because Kindle does not
-reliably index raw EPUB files copied over USB/MTP.
+reliably index raw EPUB files copied over USB/MTP. Calibre `ebook-convert` is
+the only supported EPUB conversion runtime.
 
-- Packaged builds use bundled `dist/.../tools/boko`.
-- Development builds may use `KIDNEY_BOKO` or a `boko` binary on `PATH`.
-- Do not reintroduce a bundled Calibre `.app`; it makes the package too large.
-- If replacing `boko`, check the converter output on a real Kindle and review
-license compatibility before changing packaging.
+- Do not add converter selection to the CLI or web UI without an explicit
+  product decision.
+- Command resolution order is packaged `tools/ebook-convert`, explicit
+  `KIDNEY_EBOOK_CONVERT`, then `PATH`.
+- Packaged builds do not bundle full `calibre.app`, Kindle Previewer, or boko.
+- If bundling a pruned Calibre runtime later, verify output on a real Kindle
+  Paperwhite and review license compatibility before changing packaging.
 
 ## Licensing
 
-This project is GPL-3.0-or-later because packaged builds bundle `boko`, which is
-GPL-3.0-or-later. Keep `README.md`, `LICENSE`, and `THIRD_PARTY.md` in sync when
-runtime dependencies or bundled tools change.
+This project is GPL-3.0-or-later. Keep `README.md`, `LICENSE`, and
+`THIRD_PARTY.md` in sync when runtime dependencies or bundled tools change.
 
 ## Checks
 
@@ -50,7 +52,9 @@ scripts/package-macos.sh
 For packaging changes, also verify:
 
 ```bash
-env PATH=/usr/bin:/bin:/usr/sbin:/sbin dist/kidney-darwin-$(uname -m)/kidney upload <epub-file>
+env PATH=/usr/bin:/bin:/usr/sbin:/sbin \
+  KIDNEY_EBOOK_CONVERT=/opt/homebrew/bin/ebook-convert \
+  dist/kidney-darwin-$(uname -m)/kidney upload <epub-file>
 ```
 
 Use a disposable file for Kindle upload checks and delete it after verification.
