@@ -1,0 +1,487 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>Kidney</title>
+    <style>
+      :root {
+        color-scheme: light;
+        --bg: #f6f6f3;
+        --panel: #ffffff;
+        --text: #1f2328;
+        --muted: #667085;
+        --line: #d8d9d2;
+        --accent: #176a7a;
+        --danger: #b42318;
+      }
+
+      * {
+        box-sizing: border-box;
+      }
+
+      body {
+        margin: 0;
+        background: var(--bg);
+        color: var(--text);
+        font-family: ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+      }
+
+      main {
+        width: min(1040px, calc(100vw - 32px));
+        margin: 32px auto;
+      }
+
+      header {
+        display: flex;
+        align-items: flex-end;
+        justify-content: space-between;
+        gap: 16px;
+        margin-bottom: 24px;
+      }
+
+      h1 {
+        margin: 0;
+        font-size: 32px;
+        line-height: 1.1;
+      }
+
+      h2 {
+        margin: 0 0 12px;
+        font-size: 18px;
+      }
+
+      .status {
+        display: inline-flex;
+        align-items: center;
+        gap: 8px;
+        min-height: 36px;
+        padding: 8px 12px;
+        border: 1px solid var(--line);
+        border-radius: 8px;
+        background: var(--panel);
+        color: var(--muted);
+        font-size: 14px;
+      }
+
+      .dot {
+        width: 9px;
+        height: 9px;
+        border-radius: 999px;
+        background: var(--danger);
+      }
+
+      .dot.connected {
+        background: #16803c;
+      }
+
+      .layout {
+        display: grid;
+        grid-template-columns: 320px 1fr;
+        gap: 16px;
+      }
+
+      section,
+      form {
+        border: 1px solid var(--line);
+        border-radius: 8px;
+        background: var(--panel);
+        padding: 16px;
+      }
+
+      .stack {
+        display: grid;
+        gap: 12px;
+      }
+
+      label {
+        display: grid;
+        gap: 6px;
+        color: var(--muted);
+        font-size: 13px;
+      }
+
+      input[type="text"],
+      input[type="file"] {
+        width: 100%;
+        min-height: 38px;
+        border: 1px solid var(--line);
+        border-radius: 6px;
+        background: #fff;
+        color: var(--text);
+        padding: 8px 10px;
+        font: inherit;
+      }
+
+      button {
+        min-height: 38px;
+        border: 1px solid var(--accent);
+        border-radius: 6px;
+        background: var(--accent);
+        color: #fff;
+        padding: 8px 12px;
+        font: inherit;
+        cursor: pointer;
+      }
+
+      button.secondary {
+        background: #fff;
+        color: var(--accent);
+      }
+
+      button.danger {
+        border-color: var(--danger);
+        background: var(--danger);
+      }
+
+      button:disabled {
+        cursor: not-allowed;
+        opacity: .55;
+      }
+
+      .message {
+        min-height: 22px;
+        color: var(--muted);
+        font-size: 14px;
+      }
+
+      .message.error {
+        color: var(--danger);
+      }
+
+      table {
+        width: 100%;
+        border-collapse: collapse;
+      }
+
+      th,
+      td {
+        border-bottom: 1px solid var(--line);
+        padding: 10px 8px;
+        text-align: left;
+        vertical-align: middle;
+        font-size: 14px;
+      }
+
+      th {
+        color: var(--muted);
+        font-weight: 600;
+      }
+
+      td.actions {
+        width: 280px;
+        text-align: right;
+      }
+
+      .rename {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 8px;
+        justify-content: flex-end;
+      }
+
+      .rename input {
+        width: 100%;
+        min-width: 0;
+      }
+
+      .book-path {
+        color: var(--muted);
+        font-size: 12px;
+        margin-top: 3px;
+      }
+
+      @media (max-width: 780px) {
+        header {
+          align-items: flex-start;
+          flex-direction: column;
+        }
+
+        .layout {
+          grid-template-columns: 1fr;
+        }
+
+        table,
+        tbody,
+        tr,
+        td {
+          display: block;
+          width: 100%;
+        }
+
+        thead {
+          display: none;
+        }
+
+        tr {
+          border-bottom: 1px solid var(--line);
+          padding: 8px 0;
+        }
+
+        td {
+          border: 0;
+          padding: 6px 0;
+        }
+
+        td.actions {
+          text-align: left;
+          white-space: normal;
+        }
+      }
+    </style>
+  </head>
+  <body>
+    <main>
+      <header>
+        <div>
+          <h1>Kidney</h1>
+        </div>
+        <div class="status">
+          <span id="statusDot" class="dot"></span>
+          <span id="statusText">Checking device...</span>
+        </div>
+      </header>
+
+      <div class="layout">
+        <div class="stack">
+          <form id="uploadForm">
+            <h2>Upload</h2>
+            <label>
+              Local file
+              <input id="fileInput" type="file" name="file" accept=".epub,.pdf,.mobi,.azw,.azw3,.kfx,.txt">
+            </label>
+            <label>
+              File name on Kindle
+              <input id="nameInput" type="text" name="name" placeholder="Optional">
+            </label>
+            <button type="submit">Upload</button>
+          </form>
+
+          <section>
+            <h2>Device</h2>
+            <div id="deviceDetails" class="message">No device details yet.</div>
+            <button id="unmountButton" class="secondary" type="button">Unmount</button>
+          </section>
+
+          <div id="message" class="message"></div>
+        </div>
+
+        <section>
+          <h2>Library</h2>
+          <table>
+            <thead>
+              <tr>
+                <th>Name</th>
+                <th>Size</th>
+                <th>Modified</th>
+                <th></th>
+              </tr>
+            </thead>
+            <tbody id="booksBody">
+              <tr><td colspan="4">Loading...</td></tr>
+            </tbody>
+          </table>
+        </section>
+      </div>
+    </main>
+
+    <script>
+      const state = {
+        connected: false,
+      };
+
+      const statusDot = document.getElementById('statusDot');
+      const statusText = document.getElementById('statusText');
+      const deviceDetails = document.getElementById('deviceDetails');
+      const booksBody = document.getElementById('booksBody');
+      const message = document.getElementById('message');
+      const uploadForm = document.getElementById('uploadForm');
+      const unmountButton = document.getElementById('unmountButton');
+
+      function setMessage(text, isError = false) {
+        message.textContent = text;
+        message.classList.toggle('error', isError);
+      }
+
+      function formatSize(bytes) {
+        if (bytes < 1024) return `${bytes} B`;
+        if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} KB`;
+        return `${(bytes / 1024 / 1024).toFixed(1)} MB`;
+      }
+
+      async function readJson(response) {
+        const body = await response.json().catch(() => ({}));
+        if (!response.ok) {
+          throw new Error(body.error || `Request failed with ${response.status}`);
+        }
+        return body;
+      }
+
+      async function refreshStatus() {
+        const status = await fetch('/api/status').then(readJson);
+        state.connected = status.connected;
+        statusDot.classList.toggle('connected', status.connected);
+        statusText.textContent = status.connected ? 'Kindle connected' : 'Kindle not connected';
+        unmountButton.disabled = !status.connected || !status.device?.mountPath;
+
+        if (status.device) {
+          const details = [
+            status.device.name,
+            status.device.backend,
+            status.device.model,
+            status.device.serial,
+            status.device.message,
+          ].filter(Boolean).join(' · ');
+          deviceDetails.textContent = details || 'Kindle connected';
+        } else {
+          deviceDetails.textContent = status.error || 'Connect and unlock Kindle over USB.';
+        }
+      }
+
+      async function refreshBooks() {
+        if (!state.connected) {
+          booksBody.innerHTML = '<tr><td colspan="4">Connect a Kindle to view files.</td></tr>';
+          return;
+        }
+
+        const books = await fetch('/api/books').then(readJson);
+        if (!books.length) {
+          booksBody.innerHTML = '<tr><td colspan="4">No supported files found.</td></tr>';
+          return;
+        }
+
+        booksBody.replaceChildren(...books.map(renderBookRow));
+      }
+
+      function renderBookRow(book) {
+        const row = document.createElement('tr');
+        const modified = book.modified ? new Date(book.modified).toLocaleString() : '';
+        row.innerHTML = `
+          <td>
+            <div>${escapeHtml(book.name)}</div>
+            ${book.path && book.path !== book.name ? `<div class="book-path">${escapeHtml(book.path)}</div>` : ''}
+          </td>
+          <td>${formatSize(book.sizeBytes)}</td>
+          <td>${escapeHtml(modified)}</td>
+          <td class="actions"></td>
+        `;
+
+        const actions = row.querySelector('.actions');
+        const renameWrap = document.createElement('div');
+        renameWrap.className = 'rename';
+        const bookID = book.path || book.name;
+
+        const input = document.createElement('input');
+        input.type = 'text';
+        input.value = book.name;
+
+        const downloadButton = document.createElement('button');
+        downloadButton.type = 'button';
+        downloadButton.className = 'secondary';
+        downloadButton.textContent = 'Download';
+        downloadButton.addEventListener('click', () => downloadBook(bookID));
+
+        const renameButton = document.createElement('button');
+        renameButton.type = 'button';
+        renameButton.className = 'secondary';
+        renameButton.textContent = 'Rename';
+        renameButton.addEventListener('click', () => renameBook(bookID, input.value));
+
+        const deleteButton = document.createElement('button');
+        deleteButton.type = 'button';
+        deleteButton.className = 'danger';
+        deleteButton.textContent = 'Delete';
+        deleteButton.addEventListener('click', () => deleteBook(bookID));
+
+        renameWrap.append(input, downloadButton, renameButton, deleteButton);
+        actions.append(renameWrap);
+
+        return row;
+      }
+
+      function escapeHtml(value) {
+        return String(value).replace(/[&<>"']/g, char => ({
+          '&': '&amp;',
+          '<': '&lt;',
+          '>': '&gt;',
+          '"': '&quot;',
+          "'": '&#39;',
+        }[char]));
+      }
+
+      async function refreshAll() {
+        try {
+          await refreshStatus();
+          await refreshBooks();
+        } catch (error) {
+          setMessage(error.message, true);
+        }
+      }
+
+      async function renameBook(oldName, newName) {
+        try {
+          await fetch('/api/books', {
+            method: 'PATCH',
+            headers: {'Content-Type': 'application/json'},
+            body: JSON.stringify({oldName, newName}),
+          }).then(readJson);
+          setMessage('Renamed.');
+          await refreshAll();
+        } catch (error) {
+          setMessage(error.message, true);
+        }
+      }
+
+      function downloadBook(name) {
+        window.location.href = `/api/download?name=${encodeURIComponent(name)}`;
+      }
+
+      async function deleteBook(name) {
+        if (!confirm(`Delete ${name} from Kindle?`)) {
+          return;
+        }
+
+        try {
+          const response = await fetch(`/api/books?name=${encodeURIComponent(name)}`, {method: 'DELETE'});
+          if (!response.ok) {
+            await readJson(response);
+          }
+          setMessage('Deleted.');
+          await refreshAll();
+        } catch (error) {
+          setMessage(error.message, true);
+        }
+      }
+
+      uploadForm.addEventListener('submit', async event => {
+        event.preventDefault();
+        const formData = new FormData(uploadForm);
+
+        try {
+          await fetch('/api/upload', {
+            method: 'POST',
+            body: formData,
+          }).then(readJson);
+          uploadForm.reset();
+          setMessage('Uploaded.');
+          await refreshAll();
+        } catch (error) {
+          setMessage(error.message, true);
+        }
+      });
+
+      unmountButton.addEventListener('click', async () => {
+        try {
+          await fetch('/api/unmount', {method: 'POST'}).then(readJson);
+          setMessage('Unmounted.');
+          await refreshAll();
+        } catch (error) {
+          setMessage(error.message, true);
+        }
+      });
+
+      refreshAll();
+      setInterval(refreshAll, 10000);
+    </script>
+  </body>
+</html>
