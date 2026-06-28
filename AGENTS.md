@@ -29,15 +29,19 @@ the only supported EPUB conversion runtime.
 
 - Do not add converter selection to the CLI or web UI without an explicit
   product decision.
-- Command resolution order is packaged `tools/ebook-convert`, explicit
-  `KIDNEY_EBOOK_CONVERT`, then `PATH`.
-- Packaged builds do not bundle full `calibre.app`, Kindle Previewer, or boko.
-- If bundling a pruned Calibre runtime later, verify output on a real Kindle
-  Paperwhite and review license compatibility before changing packaging.
+- Command resolution order is packaged
+  `tools/calibre.app/Contents/MacOS/ebook-convert`, packaged
+  `tools/ebook-convert`, explicit `KIDNEY_EBOOK_CONVERT`, then `PATH`.
+- Packaged builds bundle a pruned Calibre runtime through
+  `scripts/package-calibre-runtime-macos.sh`.
+- Packaged builds do not bundle full Calibre, Kindle Previewer, or boko.
+- If changing the pruned Calibre runtime allowlist, validate representative
+  EPUB files and verify output on a real Kindle Paperwhite when possible.
 
 ## Licensing
 
-This project is GPL-3.0-or-later. Keep `README.md`, `LICENSE`, and
+This project source is GPL-3.0-or-later. Packaged builds that distribute
+Calibre are GPL-3.0-only compatible. Keep `README.md`, `LICENSE`, and
 `THIRD_PARTY.md` in sync when runtime dependencies or bundled tools change.
 
 ## Checks
@@ -53,7 +57,6 @@ For packaging changes, also verify:
 
 ```bash
 env PATH=/usr/bin:/bin:/usr/sbin:/sbin \
-  KIDNEY_EBOOK_CONVERT=/opt/homebrew/bin/ebook-convert \
   dist/kidney-darwin-$(uname -m)/kidney upload <epub-file>
 ```
 

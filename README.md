@@ -33,7 +33,8 @@ go build -o kidney ./cmd/kidney
 ./kidney serve
 ```
 
-For a macOS package with bundled `libusb`:
+For a self-contained macOS package with bundled `libusb` and Calibre conversion
+runtime:
 
 ```bash
 scripts/package-macos.sh
@@ -72,10 +73,11 @@ Local development requires:
 
 - Go 1.26 or newer.
 - Homebrew `libusb` on macOS for the direct MTP backend.
-- Calibre `ebook-convert` for EPUB conversion.
+- Calibre `ebook-convert` for EPUB conversion in unpackaged development builds.
 
-Packaged macOS builds include `libusb`. Calibre is still required for EPUB
-conversion and can be installed with:
+Packaged macOS builds include `libusb` and a pruned Calibre runtime, so users do
+not need to install Calibre separately. Development builds can install Calibre
+with:
 
 ```bash
 brew install --cask calibre
@@ -100,13 +102,15 @@ ebook-convert input.epub output.azw3
 
 Kidney resolves `ebook-convert` in this order:
 
-1. Packaged tool next to the Kidney binary, `tools/ebook-convert`.
-2. Explicit path override: `KIDNEY_EBOOK_CONVERT`.
-3. `ebook-convert` on `PATH`.
+1. Packaged Calibre runtime,
+   `tools/calibre.app/Contents/MacOS/ebook-convert`.
+2. Packaged flat tool, `tools/ebook-convert`.
+3. Explicit path override: `KIDNEY_EBOOK_CONVERT`.
+4. `ebook-convert` on `PATH`.
 
 There is no converter selection in the CLI or web UI. Calibre is the only EPUB
-conversion runtime. Packaged macOS builds do not bundle full `calibre.app` or
-Kindle Previewer.
+conversion runtime. Packaged macOS builds bundle a pruned Calibre runtime, not
+the full Calibre app or Kindle Previewer.
 
 Rename changes the file name on Kindle storage only. Kidney does not edit book
 metadata in v1.
@@ -127,11 +131,13 @@ Kidney uses direct MTP operations for those devices:
 - No mounted temporary filesystem.
 
 The application package includes the native `libusb` runtime used by the MTP
-backend. Local development can use Homebrew `libusb` and Calibre
-`ebook-convert`. Packaged releases bundle `libusb`; Calibre remains an external
-runtime dependency for EPUB conversion.
+backend and a pruned Calibre runtime used by EPUB conversion. Local development
+can use Homebrew `libusb` and Calibre `ebook-convert`; packaged releases bundle
+both runtime pieces instead of asking users to install them separately.
 
 ## License
 
-Kidney is licensed under GPL-3.0-or-later. See [LICENSE](LICENSE) and
-[THIRD_PARTY.md](THIRD_PARTY.md) for third-party notices.
+Kidney source is licensed under GPL-3.0-or-later. Packaged builds bundle
+Calibre, which is GPL-3.0-only, so packaged distributions are GPL-3.0-only
+compatible. See [LICENSE](LICENSE) and [THIRD_PARTY.md](THIRD_PARTY.md) for
+third-party notices.

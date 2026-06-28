@@ -26,7 +26,9 @@ install_name_tool \
   -change "${LIBUSB_PATH}" "@executable_path/lib/libusb-1.0.0.dylib" \
   "${BIN_PATH}"
 
-UNAPPROVED_RUNTIME="$(find "${DIST_DIR}" -maxdepth 3 \( -name "calibre.app" -o -name "Kindle Previewer*.app" \) -print -quit)"
+"${ROOT_DIR}/scripts/package-calibre-runtime-macos.sh" "${DIST_DIR}"
+
+UNAPPROVED_RUNTIME="$(find "${DIST_DIR}" -maxdepth 3 -name "Kindle Previewer*.app" -print -quit)"
 if [[ -n "${UNAPPROVED_RUNTIME}" ]]; then
   echo "Unapproved EPUB conversion runtime was packaged: ${UNAPPROVED_RUNTIME}" >&2
   exit 1

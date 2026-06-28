@@ -24,7 +24,30 @@ func TestReplaceExtension(t *testing.T) {
 	}
 }
 
-func TestEbookConvertPathUsesPackagedToolBeforeEnvironmentOverride(t *testing.T) {
+func TestEbookConvertPathUsesPackagedCalibreRuntimeBeforeEnvironmentOverride(t *testing.T) {
+	tempDir := t.TempDir()
+	toolPath := filepath.Join(tempDir, "tools", "calibre.app", "Contents", "MacOS", "ebook-convert")
+	if err := os.MkdirAll(filepath.Dir(toolPath), 0o755); err != nil {
+		t.Fatalf("create calibre runtime dir failed: %v", err)
+	}
+	if err := os.WriteFile(toolPath, []byte("#!/bin/sh\n"), 0o755); err != nil {
+		t.Fatalf("write fake ebook-convert failed: %v", err)
+	}
+
+	t.Setenv("KIDNEY_EBOOK_CONVERT", "/tmp/custom-ebook-convert")
+	useExecutablePath(t, filepath.Join(tempDir, "kidney"))
+
+	got, err := ebookConvertPath()
+	if err != nil {
+		t.Fatalf("ebookConvertPath failed: %v", err)
+	}
+
+	if got != toolPath {
+		t.Fatalf("ebookConvertPath = %q, want bundled calibre runtime %q", got, toolPath)
+	}
+}
+
+func TestEbookConvertPathUsesPackagedFlatToolBeforeEnvironmentOverride(t *testing.T) {
 	tempDir := t.TempDir()
 	toolPath := filepath.Join(tempDir, "tools", "ebook-convert")
 	if err := os.MkdirAll(filepath.Dir(toolPath), 0o755); err != nil {

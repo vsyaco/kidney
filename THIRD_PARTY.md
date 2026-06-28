@@ -4,16 +4,19 @@ Kidney depends on and may package third-party components. This file is a
 human-readable summary; individual dependency source distributions remain the
 authoritative license texts.
 
-## External Runtime Dependencies
+## Bundled In Packaged Builds
 
 ### Calibre
 
 - Purpose: EPUB to AZW3 conversion through `ebook-convert`.
 - Source: https://calibre-ebook.com/
-- Packaging: not bundled. Do not copy full `calibre.app` into `dist` without a
-  separate product and licensing decision.
+- License: GPL-3.0-only.
+- Packaging: `scripts/package-calibre-runtime-macos.sh` copies a pruned Calibre
+  runtime into `dist/kidney-darwin-*/tools/calibre.app`.
 
-## Bundled In Packaged Builds
+Because packaged builds distribute Calibre, packaged distributions are
+GPL-3.0-only compatible. Do not replace the pruned runtime with a full
+`calibre.app` bundle without a separate product decision.
 
 ### libusb
 

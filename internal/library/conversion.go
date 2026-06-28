@@ -92,6 +92,12 @@ func replaceExtension(fileName string, extension string) string {
 }
 
 func ebookConvertPath() (string, error) {
+	for _, bundledPath := range bundledEbookConvertPaths() {
+		if isExecutableFile(bundledPath) {
+			return bundledPath, nil
+		}
+	}
+
 	if bundledPath, ok := bundledToolPath(ebookConvertCommandName); ok {
 		return bundledPath, nil
 	}
@@ -101,6 +107,26 @@ func ebookConvertPath() (string, error) {
 	}
 
 	return findExecutablePath(ebookConvertCommandName)
+}
+
+func bundledEbookConvertPaths() []string {
+	executablePath, err := currentExecutablePath()
+	if err != nil {
+		return nil
+	}
+
+	executableDir := filepath.Dir(executablePath)
+
+	return []string{
+		filepath.Join(
+			executableDir,
+			"tools",
+			"calibre.app",
+			"Contents",
+			"MacOS",
+			ebookConvertCommandName,
+		),
+	}
 }
 
 func bundledToolPath(commandName string) (string, bool) {
@@ -115,10 +141,15 @@ func bundledToolPath(commandName string) (string, bool) {
 		commandName,
 	)
 
-	info, err := os.Stat(toolPath)
-	if err != nil || info.IsDir() || info.Mode()&0o111 == 0 {
+	if !isExecutableFile(toolPath) {
 		return "", false
 	}
 
 	return toolPath, true
+}
+
+func isExecutableFile(filePath string) bool {
+	info, err := os.Stat(filePath)
+
+	return err == nil && !info.IsDir() && info.Mode()&0o111 != 0
 }
