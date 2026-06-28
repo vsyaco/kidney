@@ -7,11 +7,6 @@ It manages files already present on your computer and copies them to the Kindle
 documents folder. It does not download from Amazon, authenticate to Amazon, or
 remove DRM.
 
-Use Kidney when you already own the book file and just want a predictable local
-way to put it on a Kindle over USB. It keeps the workflow offline, avoids cloud
-sync and account coupling, and makes EPUB sideloading behave more like a native
-Kindle file by converting it before upload.
-
 ![Kidney library screen](docs/screenshots/kidney-library.png)
 
 ## Features
