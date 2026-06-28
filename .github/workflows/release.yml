@@ -57,7 +57,7 @@ jobs:
         if: matrix.package == 'linux'
         run: |
           sudo apt-get update
-          sudo apt-get install -y curl patchelf pkg-config libusb-1.0-0-dev
+          sudo apt-get install -y curl libegl1 libopengl0 patchelf pkg-config libusb-1.0-0-dev
           curl -fsSL https://download.calibre-ebook.com/linux-installer.sh -o "${RUNNER_TEMP}/calibre-linux-installer.sh"
           sudo sh "${RUNNER_TEMP}/calibre-linux-installer.sh" install_dir=/opt
 
