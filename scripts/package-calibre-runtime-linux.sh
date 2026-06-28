@@ -15,7 +15,11 @@ fi
 
 rm -rf "${RUNTIME_DIR}" "${TOOLS_DIR}/ebook-convert"
 mkdir -p "${TOOLS_DIR}"
-cp -a "${CALIBRE_DIR}" "${RUNTIME_DIR}"
+if ! cp -a "${CALIBRE_DIR}" "${RUNTIME_DIR}"; then
+  rm -rf "${RUNTIME_DIR}"
+  sudo cp -a "${CALIBRE_DIR}" "${RUNTIME_DIR}"
+  sudo chown -R "$(id -u):$(id -g)" "${RUNTIME_DIR}"
+fi
 ln -s "calibre/ebook-convert" "${TOOLS_DIR}/ebook-convert"
 
 "${RUNTIME_DIR}/ebook-convert" --version
