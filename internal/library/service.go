@@ -5,10 +5,11 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"path"
 	"runtime"
 	"strings"
 
-	"kidney/internal/domain"
+	"github.com/vsyaco/kidney/internal/domain"
 )
 
 type Service struct {
@@ -94,7 +95,18 @@ func (service *Service) Upload(ctx context.Context, reader io.Reader, fileName s
 		return domain.BookFile{}, err
 	}
 
-	return device.Transport.UploadFile(ctx, device.Device, reader, fileName)
+	uploadName, err := service.defaultUploadName(ctx, device, fileName)
+	if err != nil {
+		return domain.BookFile{}, err
+	}
+
+	uploadReader, uploadName, cleanup, err := convertUploadIfNeeded(ctx, reader, uploadName)
+	if err != nil {
+		return domain.BookFile{}, err
+	}
+	defer cleanup()
+
+	return device.Transport.UploadFile(ctx, device.Device, uploadReader, uploadName)
 }
 
 func (service *Service) Download(ctx context.Context, fileName string, writer io.Writer) (domain.BookFile, error) {
@@ -160,6 +172,72 @@ func (service *Service) connectedDevice(ctx context.Context) (ConnectedDevice, e
 	return ConnectedDevice{}, domain.ErrNoDevice
 }
 
+func (service *Service) defaultUploadName(ctx context.Context, device ConnectedDevice, fileName string) (string, error) {
+	if hasRelativeFolder(fileName) {
+		return fileName, nil
+	}
+
+	files, err := device.Transport.ListFiles(ctx, device.Device)
+	if err != nil {
+		return "", err
+	}
+
+	folder := dominantBookFolder(files)
+	if folder == "" {
+		return fileName, nil
+	}
+
+	return path.Join(folder, fileName), nil
+}
+
+func dominantBookFolder(files []domain.BookFile) string {
+	counts := make(map[string]int)
+	bestFolder := ""
+	bestCount := 0
+
+	for _, file := range files {
+		filePath := firstNonEmpty(file.Path, file.Name)
+		folder := parentFolder(filePath)
+		counts[folder]++
+
+		count := counts[folder]
+		if count > bestCount || count == bestCount && folder != "" && (bestFolder == "" || folder < bestFolder) {
+			bestFolder = folder
+			bestCount = count
+		}
+	}
+
+	return bestFolder
+}
+
+func hasRelativeFolder(fileName string) bool {
+	return strings.ContainsAny(strings.TrimSpace(fileName), `/\`)
+}
+
+func parentFolder(filePath string) string {
+	normalized := strings.TrimSpace(strings.ReplaceAll(filePath, "\\", "/"))
+	if normalized == "" {
+		return ""
+	}
+
+	folder := path.Dir(normalized)
+	if folder == "." {
+		return ""
+	}
+
+	return folder
+}
+
+func firstNonEmpty(values ...string) string {
+	for _, value := range values {
+		if value != "" {
+			return value
+		}
+	}
+
+	return ""
+}
+
 func FriendlyError(err error) string {
 	if err == nil {
 		return ""
@@ -192,6 +270,11 @@ func FriendlyError(err error) string {
 func dependencyErrorMessage(err error) string {
 	message := err.Error()
 	switch {
+	case strings.Contains(message, "boko"):
+		return "EPUB conversion runtime missing: boko. " + installHint(
+			"Use the packaged Kidney build or install with: cargo install boko.",
+			"Use the packaged Kidney build or install with: cargo install boko.",
+		)
 	case strings.Contains(message, "simple-mtpfs"):
 		return "MTP filesystem dependency missing: simple-mtpfs. " + installHint(
 			"Install with: brew install simple-mtpfs && brew install --cask macfuse.",

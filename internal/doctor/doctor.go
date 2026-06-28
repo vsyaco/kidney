@@ -6,8 +6,8 @@ import (
 	"strings"
 	"time"
 
-	"kidney/internal/domain"
-	"kidney/internal/transport"
+	"github.com/vsyaco/kidney/internal/domain"
+	"github.com/vsyaco/kidney/internal/transport"
 )
 
 type Check struct {

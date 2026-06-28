@@ -16,7 +16,7 @@ import (
 
 	"github.com/hanwen/go-mtpfs/mtp"
 
-	"kidney/internal/domain"
+	"github.com/vsyaco/kidney/internal/domain"
 )
 
 const amazonUSBVendorID = 6473
@@ -244,15 +244,24 @@ func (client *mtpClient) ListDocuments() ([]domain.BookFile, error) {
 }
 
 func (client *mtpClient) UploadDocument(reader io.Reader, fileName string) (domain.BookFile, error) {
-	name, err := cleanBookFileName(fileName)
+	relativePath, err := cleanMTPRelativePath(fileName)
 	if err != nil {
 		return domain.BookFile{}, err
 	}
 
-	if _, err := client.findDocument(name); err == nil {
+	if _, err := client.findDocument(relativePath); err == nil {
 		return domain.BookFile{}, domain.ErrFileAlreadyExists
 	} else if !errors.Is(err, domain.ErrFileNotFound) {
 		return domain.BookFile{}, err
+	}
+
+	name := pathName(relativePath)
+	parentID := client.documentsID
+	if parent := parentPath(relativePath); parent != "" {
+		parentID, err = client.findFolderByRelativePath(parent)
+		if err != nil {
+			return domain.BookFile{}, err
+		}
 	}
 
 	payload, err := io.ReadAll(reader)
@@ -265,13 +274,13 @@ func (client *mtpClient) UploadDocument(reader io.Reader, fileName string) (doma
 		StorageID:        client.storageID,
 		ObjectFormat:     objectFormatForFile(name),
 		CompressedSize:   uint32(len(payload)),
-		ParentObject:     client.documentsID,
+		ParentObject:     parentID,
 		Filename:         name,
 		ModificationDate: now,
 		CaptureDate:      now,
 	}
 
-	_, _, handle, err := client.device.SendObjectInfo(client.storageID, client.documentsID, info)
+	_, _, handle, err := client.device.SendObjectInfo(client.storageID, parentID, info)
 	if err != nil {
 		return domain.BookFile{}, err
 	}
@@ -285,7 +294,7 @@ func (client *mtpClient) UploadDocument(reader io.Reader, fileName string) (doma
 		return domain.BookFile{}, err
 	}
 
-	return bookFileFromMTP(*info), nil
+	return bookFileFromMTPWithPath(*info, relativePath), nil
 }
 
 func (client *mtpClient) DownloadDocument(fileName string, writer io.Writer) (domain.BookFile, error) {
@@ -491,6 +500,35 @@ func (client *mtpClient) findDocument(fileName string) (mtpObject, error) {
 	return mtpObject{}, domain.ErrFileNotFound
 }
 
+func (client *mtpClient) findFolderByRelativePath(folderPath string) (uint32, error) {
+	parent := client.documentsID
+	for _, name := range strings.Split(folderPath, "/") {
+		handle, err := client.findChildFolder(parent, name)
+		if err != nil {
+			return 0, err
+		}
+
+		parent = handle
+	}
+
+	return parent, nil
+}
+
+func (client *mtpClient) findChildFolder(parent uint32, name string) (uint32, error) {
+	objects, err := client.childObjects(parent, "")
+	if err != nil {
+		return 0, err
+	}
+
+	for _, object := range objects {
+		if object.info.ObjectFormat == mtp.OFC_Association && object.info.Filename == name {
+			return object.handle, nil
+		}
+	}
+
+	return 0, domain.ErrFileNotFound
+}
+
 func bookFileFromMTP(info mtp.ObjectInfo) domain.BookFile {
 	return bookFileFromMTPWithPath(info, info.Filename)
 }
@@ -539,6 +577,15 @@ func parentPath(path string) string {
 	}
 
 	return path[:index]
+}
+
+func pathName(path string) string {
+	index := strings.LastIndex(path, "/")
+	if index == -1 {
+		return path
+	}
+
+	return path[index+1:]
 }
 
 func objectFormatForFile(fileName string) uint16 {

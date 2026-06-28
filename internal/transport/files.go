@@ -5,11 +5,12 @@ import (
 	"fmt"
 	"io"
 	"os"
+	"path"
 	"path/filepath"
 	"slices"
 	"strings"
 
-	"kidney/internal/domain"
+	"github.com/vsyaco/kidney/internal/domain"
 )
 
 var supportedExtensions = []string{
@@ -31,17 +32,33 @@ func IsSupportedBookFile(fileName string) bool {
 }
 
 func cleanBookFileName(fileName string) (string, error) {
-	name := strings.TrimSpace(fileName)
-	if name == "" || name == "." || name == ".." {
+	name, err := cleanBookRelativePath(fileName)
+	if err != nil {
+		return "", err
+	}
+
+	if strings.Contains(name, "/") {
+		return "", domain.ErrUnsupportedFilePath
+	}
+
+	return name, nil
+}
+
+func cleanBookRelativePath(fileName string) (string, error) {
+	name := strings.TrimSpace(strings.ReplaceAll(fileName, "\\", "/"))
+	if name == "" || name == "." || name == ".." || strings.HasPrefix(name, "/") {
 		return "", domain.ErrInvalidFileName
 	}
 
-	if filepath.Base(name) != name || strings.ContainsAny(name, `/\`) {
+	if path.Clean(name) != name {
 		return "", domain.ErrUnsupportedFilePath
 	}
 
-	if filepath.Clean(name) != name {
-		return "", domain.ErrUnsupportedFilePath
+	parts := strings.Split(name, "/")
+	for _, part := range parts {
+		if part == "" || part == "." || part == ".." {
+			return "", domain.ErrUnsupportedFilePath
+		}
 	}
 
 	if !IsSupportedBookFile(name) {
@@ -52,7 +69,7 @@ func cleanBookFileName(fileName string) (string, error) {
 }
 
 func safeBookPath(root string, fileName string) (string, string, error) {
-	name, err := cleanBookFileName(fileName)
+	name, err := cleanBookRelativePath(fileName)
 	if err != nil {
 		return "", "", err
 	}
@@ -62,8 +79,8 @@ func safeBookPath(root string, fileName string) (string, string, error) {
 		return "", "", err
 	}
 
-	path := filepath.Join(cleanRoot, name)
-	rel, err := filepath.Rel(cleanRoot, path)
+	filePath := filepath.Join(cleanRoot, filepath.FromSlash(name))
+	rel, err := filepath.Rel(cleanRoot, filePath)
 	if err != nil {
 		return "", "", err
 	}
@@ -72,11 +89,49 @@ func safeBookPath(root string, fileName string) (string, string, error) {
 		return "", "", domain.ErrUnsupportedFilePath
 	}
 
-	return path, name, nil
+	return filePath, name, nil
 }
 
 func listRootFiles(root string) ([]domain.BookFile, error) {
-	entries, err := os.ReadDir(root)
+	if _, err := os.Stat(root); err != nil {
+		if errors.Is(err, os.ErrNotExist) {
+			return nil, domain.ErrNoDocumentsDirectory
+		}
+		if errors.Is(err, os.ErrPermission) {
+			return nil, domain.ErrDeviceLocked
+		}
+		return nil, err
+	}
+
+	files := make([]domain.BookFile, 0)
+	err := filepath.WalkDir(root, func(filePath string, entry os.DirEntry, err error) error {
+		if err != nil {
+			return nil
+		}
+
+		if entry.IsDir() || !IsSupportedBookFile(entry.Name()) {
+			return nil
+		}
+
+		info, err := entry.Info()
+		if err != nil {
+			return nil
+		}
+
+		relativePath, err := filepath.Rel(root, filePath)
+		if err != nil {
+			return nil
+		}
+		relativePath = filepath.ToSlash(relativePath)
+
+		files = append(files, domain.BookFile{
+			Name:      entry.Name(),
+			Path:      relativePath,
+			SizeBytes: info.Size(),
+			Modified:  info.ModTime(),
+		})
+		return nil
+	})
 	if err != nil {
 		if errors.Is(err, os.ErrNotExist) {
 			return nil, domain.ErrNoDocumentsDirectory
@@ -87,27 +142,8 @@ func listRootFiles(root string) ([]domain.BookFile, error) {
 		return nil, err
 	}
 
-	files := make([]domain.BookFile, 0, len(entries))
-	for _, entry := range entries {
-		if entry.IsDir() || !IsSupportedBookFile(entry.Name()) {
-			continue
-		}
-
-		info, err := entry.Info()
-		if err != nil {
-			continue
-		}
-
-		files = append(files, domain.BookFile{
-			Name:      entry.Name(),
-			Path:      filepath.Join(root, entry.Name()),
-			SizeBytes: info.Size(),
-			Modified:  info.ModTime(),
-		})
-	}
-
 	slices.SortFunc(files, func(left domain.BookFile, right domain.BookFile) int {
-		return strings.Compare(strings.ToLower(left.Name), strings.ToLower(right.Name))
+		return strings.Compare(strings.ToLower(left.Path), strings.ToLower(right.Path))
 	})
 
 	return files, nil
@@ -219,15 +255,18 @@ func deleteRootFile(root string, fileName string) error {
 }
 
 func renameRootFile(root string, oldName string, newName string) (domain.BookFile, error) {
-	oldPath, _, err := safeBookPath(root, oldName)
+	oldPath, cleanOldName, err := safeBookPath(root, oldName)
 	if err != nil {
 		return domain.BookFile{}, err
 	}
 
-	newPath, cleanNewName, err := safeBookPath(root, newName)
+	cleanNewName, err := cleanBookFileName(newName)
 	if err != nil {
 		return domain.BookFile{}, err
 	}
+
+	newRelativePath := joinRelativePath(parentRelativePath(cleanOldName), cleanNewName)
+	newPath := filepath.Join(filepath.Dir(oldPath), cleanNewName)
 
 	if oldPath == newPath {
 		info, err := os.Stat(oldPath)
@@ -240,7 +279,7 @@ func renameRootFile(root string, oldName string, newName string) (domain.BookFil
 
 		return domain.BookFile{
 			Name:      cleanNewName,
-			Path:      newPath,
+			Path:      newRelativePath,
 			SizeBytes: info.Size(),
 			Modified:  info.ModTime(),
 		}, nil
@@ -277,10 +316,27 @@ func renameRootFile(root string, oldName string, newName string) (domain.BookFil
 
 	return domain.BookFile{
 		Name:      cleanNewName,
-		Path:      newPath,
+		Path:      newRelativePath,
 		SizeBytes: info.Size(),
 		Modified:  info.ModTime(),
 	}, nil
+}
+
+func parentRelativePath(relativePath string) string {
+	parent := path.Dir(relativePath)
+	if parent == "." {
+		return ""
+	}
+
+	return parent
+}
+
+func joinRelativePath(parent string, name string) string {
+	if parent == "" {
+		return name
+	}
+
+	return parent + "/" + name
 }
 
 func documentsRoot(root string) (string, error) {

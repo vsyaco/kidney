@@ -8,7 +8,7 @@ import (
 	"strings"
 	"testing"
 
-	"kidney/internal/domain"
+	"github.com/vsyaco/kidney/internal/domain"
 )
 
 func TestIsSupportedBookFile(t *testing.T) {
@@ -35,11 +35,28 @@ func TestIsSupportedBookFile(t *testing.T) {
 func TestSafeBookPathRejectsTraversal(t *testing.T) {
 	root := t.TempDir()
 
-	for _, fileName := range []string{"../book.epub", "nested/book.epub", `nested\book.epub`, "..", ""} {
+	for _, fileName := range []string{"../book.epub", "nested/../book.epub", "..", ""} {
 		_, _, err := safeBookPath(root, fileName)
 		if err == nil {
 			t.Fatalf("expected %q to be rejected", fileName)
 		}
+	}
+}
+
+func TestSafeBookPathAllowsNestedRelativePath(t *testing.T) {
+	root := t.TempDir()
+
+	filePath, relativePath, err := safeBookPath(root, `Downloads\Items01\book.epub`)
+	if err != nil {
+		t.Fatalf("nested path rejected: %v", err)
+	}
+
+	if relativePath != "Downloads/Items01/book.epub" {
+		t.Fatalf("unexpected relative path: %q", relativePath)
+	}
+
+	if filePath != filepath.Join(root, "Downloads", "Items01", "book.epub") {
+		t.Fatalf("unexpected file path: %q", filePath)
 	}
 }
 
@@ -117,6 +134,12 @@ func TestListRootFilesFiltersUnsupportedAndDirectories(t *testing.T) {
 	if err := os.WriteFile(filepath.Join(root, "book.epub"), []byte("book"), 0o644); err != nil {
 		t.Fatalf("write epub failed: %v", err)
 	}
+	if err := os.MkdirAll(filepath.Join(root, "Downloads", "Items01"), 0o755); err != nil {
+		t.Fatalf("mkdir nested failed: %v", err)
+	}
+	if err := os.WriteFile(filepath.Join(root, "Downloads", "Items01", "nested.pdf"), []byte("pdf"), 0o644); err != nil {
+		t.Fatalf("write nested pdf failed: %v", err)
+	}
 	if err := os.WriteFile(filepath.Join(root, "notes.docx"), []byte("doc"), 0o644); err != nil {
 		t.Fatalf("write docx failed: %v", err)
 	}
@@ -129,7 +152,7 @@ func TestListRootFilesFiltersUnsupportedAndDirectories(t *testing.T) {
 		t.Fatalf("list failed: %v", err)
 	}
 
-	if len(files) != 1 || files[0].Name != "book.epub" {
+	if len(files) != 2 || files[0].Path != "book.epub" || files[1].Path != "Downloads/Items01/nested.pdf" {
 		t.Fatalf("unexpected files: %#v", files)
 	}
 }

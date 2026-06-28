@@ -7,7 +7,7 @@ import (
 	"testing"
 	"time"
 
-	"kidney/internal/domain"
+	"github.com/vsyaco/kidney/internal/domain"
 )
 
 type fakeTransport struct {
@@ -138,5 +138,47 @@ func TestServiceDelegatesMutations(t *testing.T) {
 	}
 	if transport.deleted != "renamed.pdf" {
 		t.Fatalf("unexpected delete: %q", transport.deleted)
+	}
+}
+
+func TestServiceUploadsPlainNameToDominantFolder(t *testing.T) {
+	device := domain.Device{ID: "1", Name: "Kindle", Backend: "fake", Connected: true}
+	transport := &fakeTransport{
+		name:    "fake",
+		devices: []domain.Device{device},
+		files: []domain.BookFile{
+			{Name: "first.pdf", Path: "Downloads/Items01/first.pdf"},
+			{Name: "second.pdf", Path: "Downloads/Items01/second.pdf"},
+			{Name: "notes.txt", Path: "notes.txt"},
+		},
+	}
+	service := NewService([]domain.Transport{transport})
+
+	if _, err := service.Upload(context.Background(), strings.NewReader("content"), "book.azw3"); err != nil {
+		t.Fatalf("upload failed: %v", err)
+	}
+
+	if transport.uploaded != "Downloads/Items01/book.azw3:content" {
+		t.Fatalf("unexpected upload target: %q", transport.uploaded)
+	}
+}
+
+func TestServiceKeepsExplicitUploadPath(t *testing.T) {
+	device := domain.Device{ID: "1", Name: "Kindle", Backend: "fake", Connected: true}
+	transport := &fakeTransport{
+		name:    "fake",
+		devices: []domain.Device{device},
+		files: []domain.BookFile{
+			{Name: "first.pdf", Path: "Downloads/Items01/first.pdf"},
+		},
+	}
+	service := NewService([]domain.Transport{transport})
+
+	if _, err := service.Upload(context.Background(), strings.NewReader("content"), "Custom/book.azw3"); err != nil {
+		t.Fatalf("upload failed: %v", err)
+	}
+
+	if transport.uploaded != "Custom/book.azw3:content" {
+		t.Fatalf("unexpected upload target: %q", transport.uploaded)
 	}
 }

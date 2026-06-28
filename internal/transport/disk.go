@@ -8,7 +8,7 @@ import (
 	"runtime"
 	"strings"
 
-	"kidney/internal/domain"
+	"github.com/vsyaco/kidney/internal/domain"
 )
 
 type DiskTransport struct {

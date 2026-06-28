@@ -10,8 +10,8 @@ import (
 	"net/url"
 	"strings"
 
-	"kidney/internal/domain"
-	"kidney/internal/library"
+	"github.com/vsyaco/kidney/internal/domain"
+	"github.com/vsyaco/kidney/internal/library"
 )
 
 //go:embed static/*

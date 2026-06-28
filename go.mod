@@ -1,4 +1,4 @@
-module kidney
+module github.com/vsyaco/kidney
 
 go 1.26.4
 
